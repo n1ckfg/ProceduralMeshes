@@ -20,8 +20,8 @@ void AHeightFieldNoiseActor::OnConstruction(const FTransform& Transform)
 	// We need to re-construct the buffers since values can be changed in editor
 	Vertices.Empty();
 	Triangles.Empty();
+	HeightValues.Empty();
 	bHaveBuffersBeenInitialized = false;
-	GeneratePoints();
 	GenerateMesh();
 }
 #endif // WITH_EDITOR
@@ -29,16 +29,17 @@ void AHeightFieldNoiseActor::OnConstruction(const FTransform& Transform)
 void AHeightFieldNoiseActor::BeginPlay()
 {
 	Super::BeginPlay();
-	GeneratePoints();
 	GenerateMesh();
 }
 
 void AHeightFieldNoiseActor::SetupMeshBuffers()
 {
+	int32 NumberOfPoints = (LengthSections + 1) * (WidthSections + 1);
 	int32 NumberOfVertices = LengthSections * WidthSections * 4; // 4x vertices per quad/section
 	int32 NumberOfTriangles = LengthSections * WidthSections * 2 * 3; // 2x3 vertex indexes per quad
 	Vertices.AddUninitialized(NumberOfVertices);
 	Triangles.AddUninitialized(NumberOfTriangles);
+	HeightValues.AddUninitialized(NumberOfPoints);
 }
 
 void AHeightFieldNoiseActor::GeneratePoints()
@@ -47,8 +48,6 @@ void AHeightFieldNoiseActor::GeneratePoints()
 
 	// Setup example height data
 	int32 NumberOfPoints = (LengthSections + 1) * (WidthSections + 1);
-	HeightValues.Empty();
-	HeightValues.AddUninitialized(NumberOfPoints);
 
 	// Fill height data with random values
 	for (int32 i = 0; i < NumberOfPoints; i++)
@@ -71,6 +70,8 @@ void AHeightFieldNoiseActor::GenerateMesh()
 		SetupMeshBuffers();
 		bHaveBuffersBeenInitialized = true;
 	}
+
+	GeneratePoints();
 
 	GenerateGrid(Vertices, Triangles, FVector2D(Size.X, Size.Y), LengthSections, WidthSections, HeightValues);
 	FBox BoundingBox = FBox(FVector(0, 0, 0), Size);
