@@ -5,8 +5,7 @@
 
 #include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
-#include "ProceduralMeshComponent.h"
-#include "ProceduralMeshData.h"
+#include "RuntimeMeshComponent.h"
 #include "SimpleCubeActor.generated.h"
 
 UCLASS()
@@ -18,13 +17,7 @@ public:
 	ASimpleCubeActor();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Depth = 100.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Width = 100.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Height = 100.0f;
+	FVector Size = FVector(100.0f, 100.0f, 100.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	UMaterialInterface* Material;
@@ -36,11 +29,18 @@ public:
 #endif   // WITH_EDITOR
 
 protected:
-	UPROPERTY(Transient, DuplicateTransient)
-	UProceduralMeshComponent* ProcMesh;
+
+	UPROPERTY()
+	URuntimeMeshComponent* MeshComponent;
 
 private:
 	void GenerateMesh();
-	void GenerateCube(FProceduralMeshData& MeshData, float Depth, float Width, float Height);
-	int32 BuildQuad(FProceduralMeshData& MeshData, FVector BottomLeft, FVector BottomRight, FVector TopRight, FVector TopLeft, int32 VertexOffset, FVector Normal, FProcMeshTangent Tangent);
+	void GenerateCube(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector Size);
+	void BuildQuad(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector BottomLeft, FVector BottomRight, FVector TopRight, FVector TopLeft, int32& VertexOffset, int32& TriangleOffset, FPackedNormal Normal, FPackedNormal Tangent);
+
+	// Mesh buffers
+	void SetupMeshBuffers();
+	bool bHaveBuffersBeenInitialized = false;
+	TArray<FRuntimeMeshVertexSimple> Vertices;
+	TArray<int32> Triangles;
 };

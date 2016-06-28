@@ -6,17 +6,22 @@
 
 ASimpleCylinderActor::ASimpleCylinderActor()
 {
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootScene"));
-	ProcMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMesh"));
-	ProcMesh->AttachTo(RootComponent);
-	// Make sure the PMC doesnt save any mesh data with the map
-	ProcMesh->SetFlags(EObjectFlags::RF_Transient);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
+	MeshComponent->bShouldSerializeMeshData = false;
+	MeshComponent->SetupAttachment(RootComponent);
 }
 
 #if WITH_EDITOR  
 void ASimpleCylinderActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+
+	// We need to re-construct the buffers since values can be changed in editor
+	Vertices.Empty();
+	Triangles.Empty();
+	SetupMeshBuffers();
+
 	GenerateMesh();
 }
 #endif // WITH_EDITOR
@@ -25,52 +30,62 @@ void ASimpleCylinderActor::BeginPlay()
 {
 	Super::BeginPlay();
 	GenerateMesh();
+}
 
-	// Fix for PCM location/rotation/scale since the whole component is Transient
-	ProcMesh->SetWorldLocation(this->GetActorLocation());
-	ProcMesh->SetWorldRotation(this->GetActorRotation());
-	ProcMesh->SetWorldScale3D(this->GetActorScale3D());
+void ASimpleCylinderActor::SetupMeshBuffers()
+{
+	int32 VertexCount = RadialSegmentCount * 4; // 4 verts per face
+	int32 TriangleCount = RadialSegmentCount * 2 * 3; // 2 triangles per face
+
+	// Count extra vertices if double sided
+	if (bDoubleSided)
+	{
+		VertexCount = VertexCount * 2;
+		TriangleCount = TriangleCount * 2;
+	}
+
+	// Count vertices for caps if set
+	if (bCapEnds)
+	{
+		// Each cap adds as many verts as there are verts in a circle
+		// 2x Number of vertices x3
+		VertexCount += 2 * (RadialSegmentCount - 1) * 3;
+		TriangleCount += 2 * (RadialSegmentCount - 1) * 3;
+	}
+
+	Vertices.AddUninitialized(VertexCount);
+	Triangles.AddUninitialized(TriangleCount);
 }
 
 void ASimpleCylinderActor::GenerateMesh()
 {
 	if (Height <= 0)
 	{
+		MeshComponent->ClearAllMeshSections();
 		return;
 	}
 
-	FProceduralMeshData MeshData = FProceduralMeshData();
-	GenerateCylinder(MeshData, Height, Radius, RadialSegmentCount, bCapEnds, bDoubleSided, bSmoothNormals);
-	ProcMesh->ClearAllMeshSections();
-	ProcMesh->CreateMeshSection(0, MeshData.Vertices, MeshData.Triangles, MeshData.Normals, MeshData.UVs, MeshData.VertexColors, MeshData.Tangents, false);
-	ProcMesh->SetMaterial(0, Material);
+	// The number of vertices or polygons wont change at runtime, so we'll just allocate the arrays once
+	if (!bHaveBuffersBeenInitialized)
+	{
+		SetupMeshBuffers();
+		bHaveBuffersBeenInitialized = true;
+	}
+
+	FBox BoundingBox = FBox(FVector(-Radius, -Radius, 0), FVector(Radius, Radius, Height));
+	GenerateCylinder(Vertices, Triangles, Height, Radius, RadialSegmentCount, bCapEnds, bDoubleSided, bSmoothNormals);
+	
+	MeshComponent->ClearAllMeshSections();
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Infrequent);
+	MeshComponent->SetMaterial(0, Material);
 }
 
-void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float InHeight, float InWidth, int32 InCrossSectionCount, bool bInCapEnds, bool bInDoubleSided, bool bInSmoothNormals/* = true*/)
+void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, float InHeight, float InWidth, int32 InCrossSectionCount, bool bInCapEnds, bool bInDoubleSided, bool bInSmoothNormals/* = true*/)
 {
 	// -------------------------------------------------------
 	// Basic setup
 	int32 VertexIndex = 0;
-	int32 NumVerts = InCrossSectionCount * 4; // 4 verts per face
-
-	 // Count extra vertices if double sided
-	if (bInDoubleSided)
-	{
-		NumVerts = NumVerts * 2;
-	}
-
-	// Count vertices for caps if set
-	if (bInCapEnds)
-	{
-		// Each cap adds as many verts as there are verts in a circle
-		// 2x Number of vertices x3
-		NumVerts += 2 * (InCrossSectionCount - 1) * 3;
-	}
-
-	MeshData.Vertices.AddUninitialized(NumVerts);
-	MeshData.Normals.AddUninitialized(NumVerts);
-	MeshData.Tangents.AddUninitialized(NumVerts);
-	MeshData.UVs.AddUninitialized(NumVerts);
+	int32 TriangleIndex = 0;
 
 	// -------------------------------------------------------
 	// Make a cylinder section
@@ -96,29 +111,29 @@ void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float
 		int32 VertIndex3 = VertexIndex++;
 		int32 VertIndex4 = VertexIndex++;
 
-		MeshData.Vertices[VertIndex1] = p0;
-		MeshData.Vertices[VertIndex2] = p1;
-		MeshData.Vertices[VertIndex3] = p2;
-		MeshData.Vertices[VertIndex4] = p3;
+		Vertices[VertIndex1].Position = p0;
+		Vertices[VertIndex2].Position = p1;
+		Vertices[VertIndex3].Position = p2;
+		Vertices[VertIndex4].Position = p3;
 
 		// Now create two triangles from those four vertices
 		// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-		MeshData.Triangles.Add(VertIndex4);
-		MeshData.Triangles.Add(VertIndex3);
-		MeshData.Triangles.Add(VertIndex1);
+		Triangles[TriangleIndex++] = VertIndex4;
+		Triangles[TriangleIndex++] = VertIndex3;
+		Triangles[TriangleIndex++] = VertIndex1;
 
-		MeshData.Triangles.Add(VertIndex3);
-		MeshData.Triangles.Add(VertIndex2);
-		MeshData.Triangles.Add(VertIndex1);
+		Triangles[TriangleIndex++] = VertIndex3;
+		Triangles[TriangleIndex++] = VertIndex2;
+		Triangles[TriangleIndex++] = VertIndex1;
 
 		// UVs.  Note that Unreal UV origin (0,0) is top left
-		MeshData.UVs[VertIndex1] = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
-		MeshData.UVs[VertIndex2] = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
-		MeshData.UVs[VertIndex3] = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
-		MeshData.UVs[VertIndex4] = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
+		Vertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
+		Vertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
+		Vertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
+		Vertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
 
 		// Normals
-		FVector NormalCurrent = FVector::CrossProduct(MeshData.Vertices[VertIndex1] - MeshData.Vertices[VertIndex3], MeshData.Vertices[VertIndex2] - MeshData.Vertices[VertIndex3]).GetSafeNormal();
+		FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
 
 		if (bInSmoothNormals)
 		{
@@ -141,21 +156,21 @@ void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float
 			FVector AverageNormalLeft = (NormalCurrent + NormalPrevious) / 2;
 			AverageNormalLeft = AverageNormalLeft.GetSafeNormal();
 
-			MeshData.Normals[VertIndex1] = AverageNormalLeft;
-			MeshData.Normals[VertIndex2] = AverageNormalRight;
-			MeshData.Normals[VertIndex3] = AverageNormalRight;
-			MeshData.Normals[VertIndex4] = AverageNormalLeft;	
+			Vertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
+			Vertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
+			Vertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
+			Vertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
 		}
 		else
 		{
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
-			MeshData.Normals[VertIndex1] = MeshData.Normals[VertIndex2] = MeshData.Normals[VertIndex3] = MeshData.Normals[VertIndex4] = NormalCurrent;
+			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 		}
 
 		// Tangents (perpendicular to the surface)
 		FVector SurfaceTangent = p0 - p1;
 		SurfaceTangent = SurfaceTangent.GetSafeNormal();
-		MeshData.Tangents[VertIndex1] = MeshData.Tangents[VertIndex2] = MeshData.Tangents[VertIndex3] = MeshData.Tangents[VertIndex4] = FProcMeshTangent(SurfaceTangent, true);
+		Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 
 		// -------------------------------------------------------
 		// If double sided, create extra polygons but face the normals the other way.
@@ -166,33 +181,33 @@ void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float
 			VertIndex3 = VertexIndex++;
 			VertIndex4 = VertexIndex++;
 
-			MeshData.Vertices[VertIndex1] = p0;
-			MeshData.Vertices[VertIndex2] = p1;
-			MeshData.Vertices[VertIndex3] = p2;
-			MeshData.Vertices[VertIndex4] = p3;
+			Vertices[VertIndex1].Position = p0;
+			Vertices[VertIndex2].Position = p1;
+			Vertices[VertIndex3].Position = p2;
+			Vertices[VertIndex4].Position = p3;
 
 			// Reverse the poly order to face them the other way
-			MeshData.Triangles.Add(VertIndex4);
-			MeshData.Triangles.Add(VertIndex1);
-			MeshData.Triangles.Add(VertIndex3);
+			Triangles[TriangleIndex++] = VertIndex4;
+			Triangles[TriangleIndex++] = VertIndex1;
+			Triangles[TriangleIndex++] = VertIndex3;
 
-			MeshData.Triangles.Add(VertIndex3);
-			MeshData.Triangles.Add(VertIndex1);
-			MeshData.Triangles.Add(VertIndex2);
+			Triangles[TriangleIndex++] = VertIndex3;
+			Triangles[TriangleIndex++] = VertIndex1;
+			Triangles[TriangleIndex++] = VertIndex2;
 
 			// UVs  (Unreal 1,1 is top left)
-			MeshData.UVs[VertIndex1] = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
-			MeshData.UVs[VertIndex2] = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
-			MeshData.UVs[VertIndex3] = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
-			MeshData.UVs[VertIndex4] = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
+			Vertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
+			Vertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
+			Vertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
+			Vertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
 
 			// Just simple (unsmoothed) normal for these
-			MeshData.Normals[VertIndex1] = MeshData.Normals[VertIndex2] = MeshData.Normals[VertIndex3] = MeshData.Normals[VertIndex4] = NormalCurrent;
+			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 
 			// Tangents (perpendicular to the surface)
 			FVector SurfaceTangent = p0 - p1;
 			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			MeshData.Tangents[VertIndex1] = MeshData.Tangents[VertIndex2] = MeshData.Tangents[VertIndex3] = MeshData.Tangents[VertIndex4] = FProcMeshTangent(SurfaceTangent, true);
+			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 		}
 
 		// -------------------------------------------------------
@@ -208,29 +223,25 @@ void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float
 			VertIndex1 = VertexIndex++;
 			VertIndex2 = VertexIndex++;
 			VertIndex3 = VertexIndex++;
-			MeshData.Vertices[VertIndex1] = capVertex0;
-			MeshData.Vertices[VertIndex2] = capVertex1;
-			MeshData.Vertices[VertIndex3] = capVertex2;
+			Vertices[VertIndex1].Position = capVertex0;
+			Vertices[VertIndex2].Position = capVertex1;
+			Vertices[VertIndex3].Position = capVertex2;
 
-			MeshData.Triangles.Add(VertIndex1);
-			MeshData.Triangles.Add(VertIndex2);
-			MeshData.Triangles.Add(VertIndex3);
+			Triangles[TriangleIndex++] = VertIndex1;
+			Triangles[TriangleIndex++] = VertIndex2;
+			Triangles[TriangleIndex++] = VertIndex3;
 
-			FVector2D UV1 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
-			FVector2D UV2 = FVector2D(0.5f - (FMath::Cos(-Angle) / 2.0f), 0.5f - (FMath::Sin(-Angle) / 2.0f));
-			FVector2D UV3 = FVector2D(0.5f - (FMath::Cos(-NextAngle) / 2.0f), 0.5f - (FMath::Sin(-NextAngle) / 2.0f));
+			Vertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
+			Vertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(-Angle) / 2.0f), 0.5f - (FMath::Sin(-Angle) / 2.0f));
+			Vertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(-NextAngle) / 2.0f), 0.5f - (FMath::Sin(-NextAngle) / 2.0f));
 
-			MeshData.UVs[VertIndex1] = UV1;
-			MeshData.UVs[VertIndex2] = UV2;
-			MeshData.UVs[VertIndex3] = UV3;
-
-			FVector NormalCurrent = FVector::CrossProduct(MeshData.Vertices[VertIndex1] - MeshData.Vertices[VertIndex3], MeshData.Vertices[VertIndex2] - MeshData.Vertices[VertIndex3]).GetSafeNormal();
-			MeshData.Normals[VertIndex1] = MeshData.Normals[VertIndex2] = MeshData.Normals[VertIndex3] = NormalCurrent;
+			FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
+			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = FPackedNormal(NormalCurrent);
 
 			// Tangents (perpendicular to the surface)
 			FVector SurfaceTangent = p0 - p1;
 			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			MeshData.Tangents[VertIndex1] = MeshData.Tangents[VertIndex2] = MeshData.Tangents[VertIndex3] = FProcMeshTangent(SurfaceTangent, true);
+			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangent);
 
 			// Top cap
 			capVertex0 = capVertex0 + Offset;
@@ -240,29 +251,25 @@ void ASimpleCylinderActor::GenerateCylinder(FProceduralMeshData& MeshData, float
 			VertIndex1 = VertexIndex++;
 			VertIndex2 = VertexIndex++;
 			VertIndex3 = VertexIndex++;
-			MeshData.Vertices[VertIndex1] = capVertex0;
-			MeshData.Vertices[VertIndex2] = capVertex1;
-			MeshData.Vertices[VertIndex3] = capVertex2;
+			Vertices[VertIndex1].Position = capVertex0;
+			Vertices[VertIndex2].Position = capVertex1;
+			Vertices[VertIndex3].Position = capVertex2;
 
-			MeshData.Triangles.Add(VertIndex3);
-			MeshData.Triangles.Add(VertIndex2);
-			MeshData.Triangles.Add(VertIndex1);
+			Triangles[TriangleIndex++] = VertIndex3;
+			Triangles[TriangleIndex++] = VertIndex2;
+			Triangles[TriangleIndex++] = VertIndex1;
 
-			UV1 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
-			UV2 = FVector2D(0.5f - (FMath::Cos(Angle) / 2.0f), 0.5f - (FMath::Sin(Angle) / 2.0f));
-			UV3 = FVector2D(0.5f - (FMath::Cos(NextAngle) / 2.0f), 0.5f - (FMath::Sin(NextAngle) / 2.0f));
+			Vertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
+			Vertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(Angle) / 2.0f), 0.5f - (FMath::Sin(Angle) / 2.0f));
+			Vertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(NextAngle) / 2.0f), 0.5f - (FMath::Sin(NextAngle) / 2.0f));
 
-			MeshData.UVs[VertIndex1] = UV1;
-			MeshData.UVs[VertIndex2] = UV2;
-			MeshData.UVs[VertIndex3] = UV3;
-
-			NormalCurrent = FVector::CrossProduct(MeshData.Vertices[VertIndex1] - MeshData.Vertices[VertIndex3], MeshData.Vertices[VertIndex2] - MeshData.Vertices[VertIndex3]).GetSafeNormal();
-			MeshData.Normals[VertIndex1] = MeshData.Normals[VertIndex2] = MeshData.Normals[VertIndex3] = NormalCurrent;
+			NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
+			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = FPackedNormal(NormalCurrent);
 
 			// Tangents (perpendicular to the surface)
 			SurfaceTangent = p0 - p1;
 			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			MeshData.Tangents[VertIndex1] = MeshData.Tangents[VertIndex2] = MeshData.Tangents[VertIndex3] = FProcMeshTangent(SurfaceTangent, true);
+			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangent);
 		}
 	}
 }

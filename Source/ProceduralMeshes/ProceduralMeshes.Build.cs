@@ -11,7 +11,7 @@ public class ProceduralMeshes : ModuleRules
 
         PrivateIncludePaths.AddRange(new string[] { "ProceduralMeshes/Private" });
 
-        PublicDependencyModuleNames.AddRange(new string[] { "Core", "ProceduralMeshComponent" });
+        PublicDependencyModuleNames.AddRange(new string[] { "Core", "ProceduralMeshComponent", "RenderCore", "ShaderCore", "RHI", "RuntimeMeshComponent" });
 
 
         PrivateDependencyModuleNames.AddRange(

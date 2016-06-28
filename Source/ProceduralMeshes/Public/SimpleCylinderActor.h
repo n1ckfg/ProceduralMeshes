@@ -5,8 +5,7 @@
 
 #include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
-#include "ProceduralMeshComponent.h"
-#include "ProceduralMeshData.h"
+#include "RuntimeMeshComponent.h"
 #include "SimpleCylinderActor.generated.h"
 
 UCLASS()
@@ -45,10 +44,18 @@ public:
 #endif   // WITH_EDITOR
 
 protected:
-	UPROPERTY(Transient, DuplicateTransient)
-	UProceduralMeshComponent* ProcMesh;
+	
+	UPROPERTY()
+	URuntimeMeshComponent* MeshComponent;
 
 private:
+
 	void GenerateMesh();
-	void GenerateCylinder(FProceduralMeshData& MeshData, float Height, float InWidth, int32 InCrossSectionCount, bool bCapEnds = false, bool bDoubleSided = false, bool bInSmoothNormals = true);
+	void GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, float Height, float InWidth, int32 InCrossSectionCount, bool bCapEnds = false, bool bDoubleSided = false, bool bInSmoothNormals = true);
+
+	// Mesh buffers
+	void SetupMeshBuffers();
+	bool bHaveBuffersBeenInitialized = false;
+	TArray<FRuntimeMeshVertexSimple> Vertices;
+	TArray<int32> Triangles;
 };
