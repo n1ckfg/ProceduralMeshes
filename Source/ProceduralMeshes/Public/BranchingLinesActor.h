@@ -5,8 +5,7 @@
 
 #include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
-#include "ProceduralMeshComponent.h"
-#include "ProceduralMeshData.h"
+#include "RuntimeMeshComponent.h"
 #include "BranchingLinesActor.generated.h"
 
 // A simple struct to keep some data together
@@ -127,8 +126,9 @@ public:
 #endif   // WITH_EDITOR
 
 protected:
-	UPROPERTY(Transient, DuplicateTransient)
-	UProceduralMeshComponent* ProcMesh;
+
+	UPROPERTY()
+	URuntimeMeshComponent* MeshComponent;
 
 private:
 	void GenerateMesh();
@@ -138,7 +138,8 @@ private:
 	TArray<FBranchSegment> Segments;
 
 	void AddSection(FVector InBottomLeftPoint, FVector InTopPoint, FVector InBottomRightPoint, FVector InBottomMiddlePoint, int32 InDepth);
-	void GenerateCylinder(FProceduralMeshData& MeshData, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32 InVertexIndexStart, bool bInSmoothNormals = true);
+	void GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32& VertexIndex, int32& TriangleIndex, bool bInSmoothNormals = true);
+	FBox GetBounds();
 
 	FVector RotatePointAroundPivot(FVector InPoint, FVector InPivot, FVector InAngles);
 	void PreCacheCrossSection();
@@ -152,4 +153,10 @@ private:
 
 	UPROPERTY(Transient)
 	FRandomStream RngStream = FRandomStream::FRandomStream();
+
+	// Mesh buffers
+	void SetupMeshBuffers();
+	bool bHaveBuffersBeenInitialized = false;
+	TArray<FRuntimeMeshVertexSimple> Vertices;
+	TArray<int32> Triangles;
 };
