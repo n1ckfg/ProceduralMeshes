@@ -6,11 +6,10 @@
 
 AHeightFieldAnimatedActor::AHeightFieldAnimatedActor()
 {
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootScene"));
-	ProcMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMesh"));
-	ProcMesh->AttachTo(RootComponent);
-	// Make sure the PMC doesnt save any mesh data with the map
-	ProcMesh->SetFlags(EObjectFlags::RF_Transient);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
+	MeshComponent->bShouldSerializeMeshData = false;
+	MeshComponent->SetupAttachment(RootComponent);
 
 	PrimaryActorTick.bCanEverTick = true;
 }
@@ -19,6 +18,12 @@ AHeightFieldAnimatedActor::AHeightFieldAnimatedActor()
 void AHeightFieldAnimatedActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	
+	// We need to re-construct the buffers since values can be changed in editor
+	Vertices.Empty();
+	Triangles.Empty();
+	HeightValues.Empty();
+	bHaveBuffersBeenInitialized = false;
 	GenerateMesh();
 }
 #endif // WITH_EDITOR
@@ -27,11 +32,42 @@ void AHeightFieldAnimatedActor::BeginPlay()
 {
 	Super::BeginPlay();
 	GenerateMesh();
+}
 
-	// Fix for PCM location/rotation/scale since the whole component is Transient
-	ProcMesh->SetWorldLocation(this->GetActorLocation());
-	ProcMesh->SetWorldRotation(this->GetActorRotation());
-	ProcMesh->SetWorldScale3D(this->GetActorScale3D());
+void AHeightFieldAnimatedActor::SetupMeshBuffers()
+{
+	int32 NumberOfPoints = (LengthSections + 1) * (WidthSections + 1);
+	int32 NumberOfTriangles = LengthSections * WidthSections * 2 * 3; // 2x3 vertex indexes per quad
+	Vertices.AddUninitialized(NumberOfPoints);
+	Triangles.AddUninitialized(NumberOfTriangles);
+	HeightValues.AddUninitialized(NumberOfPoints);
+}
+
+void AHeightFieldAnimatedActor::GeneratePoints()
+{
+	// Setup example height data
+	int32 NumberOfPoints = (LengthSections + 1) * (WidthSections + 1);
+
+	// Combine variations of sine and cosine to create some variable waves
+	// TODO Convert this to use a parallel for
+	int32 PointIndex = 0;
+
+	for (int32 X = 0; X < LengthSections + 1; X++)
+	{
+		for (int32 Y = 0; Y < WidthSections + 1; Y++)
+		{
+			// Just some quick hardcoded offset numbers in there
+			float ValueOne = FMath::Cos((X + CurrentAnimationFrameX)*ScaleFactor) * FMath::Sin((Y + CurrentAnimationFrameY)*ScaleFactor);
+			float ValueTwo = FMath::Cos((X + CurrentAnimationFrameX*0.7f)*ScaleFactor*2.5f) * FMath::Sin((Y - CurrentAnimationFrameY*0.7f)*ScaleFactor*2.5f);
+			float AvgValue = ((ValueOne + ValueTwo) / 2) * Size.Z;
+			HeightValues[PointIndex++] = AvgValue;
+
+			if (AvgValue > MaxHeightValue)
+			{
+				MaxHeightValue = AvgValue;
+			}
+		}
+	}
 }
 
 void AHeightFieldAnimatedActor::Tick(float DeltaSeconds)
@@ -46,49 +82,34 @@ void AHeightFieldAnimatedActor::Tick(float DeltaSeconds)
 
 void AHeightFieldAnimatedActor::GenerateMesh()
 {
-	if (Length < 1 || Width < 1 || LengthSections < 1 || WidthSections < 1)
+	if (Size.X < 1 || Size.Y < 1 || LengthSections < 1 || WidthSections < 1)
 	{
+		MeshComponent->ClearAllMeshSections();
 		return;
 	}
 
-	// Setup example height data
-	int32 NumberOfPoints = (LengthSections + 1) * (WidthSections + 1);
-	TArray<float> HeightValues;
-	HeightValues.AddUninitialized(NumberOfPoints);
-
-	// Combine variations of sine and cosine to create some variable waves
-	int32 VertexIndex = 0;
-
-	for (int32 X = 0; X < LengthSections + 1; X++)
+	// The number of vertices or polygons wont change at runtime, so we'll just allocate the arrays once
+	if (!bHaveBuffersBeenInitialized)
 	{
-		for (int32 Y = 0; Y < WidthSections + 1; Y++)
-		{
-			// Just some quick hardcoded offset numbers in there
-			float ValueOne = FMath::Cos((X + CurrentAnimationFrameX)*ScaleFactor) + FMath::Sin((Y + CurrentAnimationFrameY)*ScaleFactor);
-			float ValueTwo = FMath::Cos((X + CurrentAnimationFrameX*0.7f)*ScaleFactor*2.5f) + FMath::Sin((Y - CurrentAnimationFrameY*0.7f)*ScaleFactor*2.5f);
-			HeightValues[VertexIndex++] = ((ValueOne + ValueTwo) / 2) * Height;
-		}
+		SetupMeshBuffers();
+		bHaveBuffersBeenInitialized = true;
 	}
 
-	// This example re-uses vertices between polygons.
-	FProceduralMeshData MeshData = FProceduralMeshData();
-	MeshData.Vertices.AddUninitialized(NumberOfPoints);
-	MeshData.Triangles.AddUninitialized(LengthSections * WidthSections * 2 * 3); // 2x3 vertex per quad
-	MeshData.Normals.AddUninitialized(NumberOfPoints);
-	MeshData.UVs.AddUninitialized(NumberOfPoints);
-	MeshData.Tangents.AddUninitialized(NumberOfPoints);
+	GeneratePoints();
 
-	GenerateGrid(MeshData, Length, Width, LengthSections, WidthSections, HeightValues);
-	ProcMesh->ClearAllMeshSections();
-	ProcMesh->CreateMeshSection(0, MeshData.Vertices, MeshData.Triangles, MeshData.Normals, MeshData.UVs, MeshData.VertexColors, MeshData.Tangents, false);
-	ProcMesh->SetMaterial(0, Material);
+	// TODO Convert this to use fast-past updates instead of regenerating the mesh every frame
+	GenerateGrid(Vertices, Triangles, FVector2D(Size.X, Size.Y), LengthSections, WidthSections, HeightValues);
+	FBox BoundingBox = FBox(FVector(0, 0, -MaxHeightValue), FVector(Size.X, Size.Y, MaxHeightValue));
+	MeshComponent->ClearAllMeshSections();
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Infrequent);
+	MeshComponent->SetMaterial(0, Material);
 }
 
-void AHeightFieldAnimatedActor::GenerateGrid(FProceduralMeshData& MeshData, float InLength, float InWidth, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
+void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
 {
 	// Note the coordinates are a bit weird here since I aligned it to the transform (X is forwards or "up", which Y is to the right)
 	// Should really fix this up and use standard X, Y coords then transform into object space?
-	FVector2D SectionSize = FVector2D(InLength / InLengthSections, InWidth / InWidthSections);
+	FVector2D SectionSize = FVector2D(InSize.X / InLengthSections, InSize.Y / InWidthSections);
 	int32 VertexIndex = 0;
 	int32 TriangleIndex = 0;
 
@@ -99,12 +120,12 @@ void AHeightFieldAnimatedActor::GenerateGrid(FProceduralMeshData& MeshData, floa
 			// Create a new vertex
 			int32 NewVertIndex = VertexIndex++;
 			FVector newVertex = FVector(X * SectionSize.X, Y * SectionSize.Y, InHeightValues[NewVertIndex]);
-			MeshData.Vertices[NewVertIndex] = newVertex;
+			Vertices[NewVertIndex].Position = newVertex;
 
 			// Note that Unreal UV origin (0,0) is top left
 			float U = (float)X / (float)InLengthSections;
 			float V = (float)Y / (float)InWidthSections;
-			MeshData.UVs[NewVertIndex] = FVector2D(U, V);
+			Vertices[NewVertIndex].UV0 = FVector2D(U, V);
 
 			// Once we've created enough verts we can start adding polygons
 			if (X > 0 && Y > 0)
@@ -119,13 +140,13 @@ void AHeightFieldAnimatedActor::GenerateGrid(FProceduralMeshData& MeshData, floa
 
 				// Now create two triangles from those four vertices
 				// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-				MeshData.Triangles[TriangleIndex++] = pBottomLeftIndex;
-				MeshData.Triangles[TriangleIndex++] = bTopRightIndex;
-				MeshData.Triangles[TriangleIndex++] = bTopLeftIndex;
+				Triangles[TriangleIndex++] = pBottomLeftIndex;
+				Triangles[TriangleIndex++] = bTopRightIndex;
+				Triangles[TriangleIndex++] = bTopLeftIndex;
 
-				MeshData.Triangles[TriangleIndex++] = pBottomLeftIndex;
-				MeshData.Triangles[TriangleIndex++] = pBottomRightIndex;
-				MeshData.Triangles[TriangleIndex++] = bTopRightIndex;
+				Triangles[TriangleIndex++] = pBottomLeftIndex;
+				Triangles[TriangleIndex++] = pBottomRightIndex;
+				Triangles[TriangleIndex++] = bTopRightIndex;
 			}
 		}
 	}
