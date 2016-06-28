@@ -6,11 +6,10 @@
 
 ASierpinskiLineActor::ASierpinskiLineActor()
 {
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("RootScene"));
-	ProcMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("ProceduralMesh"));
-	ProcMesh->AttachTo(RootComponent);
-	// Make sure the PMC doesnt save any mesh data with the map
-	ProcMesh->SetFlags(EObjectFlags::RF_Transient);
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
+	MeshComponent->bShouldSerializeMeshData = false;
+	MeshComponent->SetupAttachment(RootComponent);
 }
 
 #if WITH_EDITOR  
@@ -18,6 +17,12 @@ void ASierpinskiLineActor::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	PreCacheCrossSection();
+
+	// We need to re-construct the buffers since values can be changed in editor
+	Vertices.Empty();
+	Triangles.Empty();
+	bHaveBuffersBeenInitialized = false;
+	GenerateLines();
 	GenerateMesh();
 }
 #endif // WITH_EDITOR
@@ -26,66 +31,45 @@ void ASierpinskiLineActor::BeginPlay()
 {
 	Super::BeginPlay();
 	PreCacheCrossSection();
+	GenerateLines();
 	GenerateMesh();
+}
 
-	// Fix for PCM location/rotation/scale since the whole component is Transient
-	ProcMesh->SetWorldLocation(this->GetActorLocation());
-	ProcMesh->SetWorldRotation(this->GetActorRotation());
-	ProcMesh->SetWorldScale3D(this->GetActorScale3D());
+void ASierpinskiLineActor::SetupMeshBuffers()
+{
+	int32 TotalNumberOfVerticesPerSection = RadialSegmentCount * 4; // 4 verts per face 
+	int32 TotalNumberOfTrianglesPerSection = TotalNumberOfVerticesPerSection + 2 * RadialSegmentCount;
+	Vertices.AddUninitialized(TotalNumberOfVerticesPerSection * Lines.Num());
+	Triangles.AddUninitialized(TotalNumberOfTrianglesPerSection * Lines.Num());
 }
 
 void ASierpinskiLineActor::GenerateMesh()
 {
-	Lines.Empty();
-
-	// -------------------------------------------------------
-	// Start by setting the four points that define a pyramid
-	// 0,0 is center bottom.. so first two are offset half Size to the sides, and the 3rd straight up
-	FVector BottomLeftPoint = FVector(0, -0.5f * Size, 0);
-	FVector BottomRightPoint = FVector(0, 0.5f * Size, 0);
-	float ThirdBasePointDistance = FMath::Sqrt(3) * Size / 2;
-	FVector BottomMiddlePoint = FVector(ThirdBasePointDistance, 0, 0);
-	float CenterPosX = FMath::Tan(FMath::DegreesToRadians(30)) * (Size / 2.0f);
-	FVector TopPoint = FVector(CenterPosX, 0, ThirdBasePointDistance);
-
-	// Then create all the lines between those 4 points
-	Lines.Add(FPyramidLine(BottomLeftPoint, BottomRightPoint, LineThickness));
-	Lines.Add(FPyramidLine(BottomRightPoint, TopPoint, LineThickness));
-	Lines.Add(FPyramidLine(TopPoint, BottomLeftPoint, LineThickness));
-
-	Lines.Add(FPyramidLine(BottomLeftPoint, BottomMiddlePoint, LineThickness));
-	Lines.Add(FPyramidLine(BottomMiddlePoint, BottomRightPoint, LineThickness));
-	Lines.Add(FPyramidLine(BottomMiddlePoint, TopPoint, LineThickness));
-
-	// -------------------------------------------------------
-	// Create the rest of the lines through recursion
-	AddSection(BottomLeftPoint, TopPoint, BottomRightPoint, BottomMiddlePoint, 1);
-
-	// -------------------------------------------------------
-	// Calculate and pre-allocate buffers
-	int32 TotalNumberOfVerticesPerSection = RadialSegmentCount * 4; // 4 verts per face 
-	int32 TotalNumberOfTrianglesPerSection = TotalNumberOfVerticesPerSection + 2 * RadialSegmentCount;
-
-	FProceduralMeshData MeshData = FProceduralMeshData();
-	MeshData.Vertices.AddUninitialized(TotalNumberOfVerticesPerSection * Lines.Num());
-	MeshData.Triangles.AddUninitialized(TotalNumberOfTrianglesPerSection * Lines.Num());
-	MeshData.Normals.AddUninitialized(TotalNumberOfVerticesPerSection * Lines.Num());
-	MeshData.UVs.AddUninitialized(TotalNumberOfVerticesPerSection * Lines.Num());
-	MeshData.Tangents.AddUninitialized(TotalNumberOfVerticesPerSection * Lines.Num());
+	// The number of vertices or polygons wont change at runtime, so we'll just allocate the arrays once
+	if (!bHaveBuffersBeenInitialized)
+	{
+		SetupMeshBuffers();
+		bHaveBuffersBeenInitialized = true;
+	}
 
 	// -------------------------------------------------------
 	// Now lets loop through all the defined lines of the pyramid and create a cylinder for each
-	int32 CurrentIndexStart = 0;
+	int32 VertexIndex = 0;
+	int32 TriangleIndex = 0;
 
 	for (int32 i = 0; i < Lines.Num(); i++)
 	{
-		CurrentIndexStart = i * TotalNumberOfVerticesPerSection;
-		GenerateCylinder(MeshData, Lines[i].Start, Lines[i].End, Lines[i].Width, RadialSegmentCount, CurrentIndexStart, bSmoothNormals);
+		GenerateCylinder(Vertices, Triangles, Lines[i].Start, Lines[i].End, Lines[i].Width, RadialSegmentCount, VertexIndex, TriangleIndex, bSmoothNormals);
 	}
-	
-	ProcMesh->ClearAllMeshSections();
-	ProcMesh->CreateMeshSection(0, MeshData.Vertices, MeshData.Triangles, MeshData.Normals, MeshData.UVs, MeshData.VertexColors, MeshData.Tangents, false);
-	ProcMesh->SetMaterial(0, Material);
+
+	// Find bounding box
+	float Height = FMath::Sqrt(3) * Size / 2;
+	float HalfSize = Size / 2;
+	FBox BoundingBox = FBox(FVector(-LineThickness, -HalfSize - LineThickness, - LineThickness), FVector(Height + LineThickness, HalfSize + LineThickness, Height + LineThickness));
+
+	MeshComponent->ClearAllMeshSections();
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Average);
+	MeshComponent->SetMaterial(0, Material);
 }
 
 FVector ASierpinskiLineActor::RotatePointAroundPivot(FVector InPoint, FVector InPivot, FVector InAngles)
@@ -114,6 +98,34 @@ void ASierpinskiLineActor::PreCacheCrossSection()
 	}
 
 	LastCachedCrossSectionCount = RadialSegmentCount;
+}
+
+void ASierpinskiLineActor::GenerateLines()
+{
+	Lines.Empty();
+
+	// -------------------------------------------------------
+	// Start by setting the four points that define a pyramid
+	// 0,0 is center bottom.. so first two are offset half Size to the sides, and the 3rd straight up
+	FVector BottomLeftPoint = FVector(0, -0.5f * Size, 0);
+	FVector BottomRightPoint = FVector(0, 0.5f * Size, 0);
+	float ThirdBasePointDistance = FMath::Sqrt(3) * Size / 2;
+	FVector BottomMiddlePoint = FVector(ThirdBasePointDistance, 0, 0);
+	float CenterPosX = FMath::Tan(FMath::DegreesToRadians(30)) * (Size / 2.0f);
+	FVector TopPoint = FVector(CenterPosX, 0, ThirdBasePointDistance);
+
+	// Then create all the lines between those 4 points
+	Lines.Add(FPyramidLine(BottomLeftPoint, BottomRightPoint, LineThickness));
+	Lines.Add(FPyramidLine(BottomRightPoint, TopPoint, LineThickness));
+	Lines.Add(FPyramidLine(TopPoint, BottomLeftPoint, LineThickness));
+
+	Lines.Add(FPyramidLine(BottomLeftPoint, BottomMiddlePoint, LineThickness));
+	Lines.Add(FPyramidLine(BottomMiddlePoint, BottomRightPoint, LineThickness));
+	Lines.Add(FPyramidLine(BottomMiddlePoint, TopPoint, LineThickness));
+
+	// -------------------------------------------------------
+	// Create the rest of the lines through recursion
+	AddSection(BottomLeftPoint, TopPoint, BottomRightPoint, BottomMiddlePoint, 1);
 }
 
 void ASierpinskiLineActor::AddSection(FVector InBottomLeftPoint, FVector InTopPoint, FVector InBottomRightPoint, FVector InBottomMiddlePoint, int32 InDepth)
@@ -168,12 +180,8 @@ void ASierpinskiLineActor::AddSection(FVector InBottomLeftPoint, FVector InTopPo
 	AddSection(BottomLeftPoint, MiddlePointUp, BottomRightPoint, InBottomMiddlePoint, InDepth + 1); // Lower middle pyramid
 }
 
-void ASierpinskiLineActor::GenerateCylinder(FProceduralMeshData& MeshData, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32 InVertexIndexStart, bool bInSmoothNormals/* = true*/)
+void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32& VertexIndex, int32& TriangleIndex, bool bInSmoothNormals/* = true*/)
 {
-	// Basic setup
-	int32 VertexIndex = InVertexIndexStart;
-	int32 NumVerts = InCrossSectionCount * 4; // 4 verts per face
-
 	// Make a cylinder section
 	const float AngleBetweenQuads = (2.0f / (float)(InCrossSectionCount)) * PI;
 	const float UMapPerQuad = 1.0f / (float)InCrossSectionCount;
@@ -206,29 +214,29 @@ void ASierpinskiLineActor::GenerateCylinder(FProceduralMeshData& MeshData, FVect
 		int32 VertIndex3 = VertexIndex++;
 		int32 VertIndex4 = VertexIndex++;
 
-		MeshData.Vertices[VertIndex1] = p0;
-		MeshData.Vertices[VertIndex2] = p1;
-		MeshData.Vertices[VertIndex3] = p2;
-		MeshData.Vertices[VertIndex4] = p3;
+		Vertices[VertIndex1].Position = p0;
+		Vertices[VertIndex2].Position = p1;
+		Vertices[VertIndex3].Position = p2;
+		Vertices[VertIndex4].Position = p3;
 
 		// Now create two triangles from those four vertices
 		// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-		MeshData.Triangles.Add(VertIndex4);
-		MeshData.Triangles.Add(VertIndex3);
-		MeshData.Triangles.Add(VertIndex1);
+		Triangles[TriangleIndex++] = VertIndex4;
+		Triangles[TriangleIndex++] = VertIndex3;
+		Triangles[TriangleIndex++] = VertIndex1;
 
-		MeshData.Triangles.Add(VertIndex3);
-		MeshData.Triangles.Add(VertIndex2);
-		MeshData.Triangles.Add(VertIndex1);
+		Triangles[TriangleIndex++] = VertIndex3;
+		Triangles[TriangleIndex++] = VertIndex2;
+		Triangles[TriangleIndex++] = VertIndex1;
 
 		// UVs.  Note that Unreal UV origin (0,0) is top left
-		MeshData.UVs[VertIndex1] = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 1.0f);
-		MeshData.UVs[VertIndex2] = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 1.0f);
-		MeshData.UVs[VertIndex3] = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 0.0f);
-		MeshData.UVs[VertIndex4] = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 0.0f);
+		Vertices[VertIndex1].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 1.0f);
+		Vertices[VertIndex2].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 1.0f);
+		Vertices[VertIndex3].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 0.0f);
+		Vertices[VertIndex4].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 0.0f);
 
 		// Normals
-		FVector NormalCurrent = FVector::CrossProduct(MeshData.Vertices[VertIndex1] - MeshData.Vertices[VertIndex3], MeshData.Vertices[VertIndex2] - MeshData.Vertices[VertIndex3]).GetSafeNormal();
+		FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
 
 		if (bInSmoothNormals)
 		{
@@ -253,20 +261,20 @@ void ASierpinskiLineActor::GenerateCylinder(FProceduralMeshData& MeshData, FVect
 			FVector AverageNormalLeft = (NormalCurrent + NormalPrevious) / 2;
 			AverageNormalLeft = AverageNormalLeft.GetSafeNormal();
 
-			MeshData.Normals[VertIndex1] = AverageNormalLeft;
-			MeshData.Normals[VertIndex2] = AverageNormalRight;
-			MeshData.Normals[VertIndex3] = AverageNormalRight;
-			MeshData.Normals[VertIndex4] = AverageNormalLeft;
+			Vertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
+			Vertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
+			Vertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
+			Vertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
 		}
 		else
 		{
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
-			MeshData.Normals[VertIndex1] = MeshData.Normals[VertIndex2] = MeshData.Normals[VertIndex3] = MeshData.Normals[VertIndex4] = NormalCurrent;
+			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 		}
 
 		// Tangents (perpendicular to the surface)
 		FVector SurfaceTangent = p0 - p1;
 		SurfaceTangent = SurfaceTangent.GetSafeNormal();
-		MeshData.Tangents[VertIndex1] = MeshData.Tangents[VertIndex2] = MeshData.Tangents[VertIndex3] = MeshData.Tangents[VertIndex4] = FProcMeshTangent(SurfaceTangent, true);
+		Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 	}
 }
