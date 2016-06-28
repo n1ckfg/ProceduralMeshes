@@ -117,7 +117,7 @@ FBox ACylinderStripActor::GetBounds()
 	RangeZ.X -= Radius;
 	RangeZ.Y += Radius;
 	
-	return FBox(FVector(RangeX.X, RangeY.X, RangeZ.X), FVector(RangeX.Y, RangeY.Y, RangeZ.Y));;
+	return FBox(FVector(RangeX.X, RangeY.X, RangeZ.X), FVector(RangeX.Y, RangeY.Y, RangeZ.Y));
 }
 
 FVector ACylinderStripActor::RotatePointAroundPivot(FVector InPoint, FVector InPivot, FVector InAngles)
