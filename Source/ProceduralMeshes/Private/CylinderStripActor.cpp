@@ -70,7 +70,7 @@ void ACylinderStripActor::GenerateMesh()
 	}
 
 	MeshComponent->ClearAllMeshSections();
-	MeshComponent->CreateMeshSection(0, Vertices, Triangles, GetBounds(), false, EUpdateFrequency::Average);
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, GetBounds(), false, EUpdateFrequency::Infrequent);
 	MeshComponent->SetMaterial(0, Material);
 }
 

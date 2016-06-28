@@ -76,7 +76,7 @@ void AHeightFieldNoiseActor::GenerateMesh()
 	GenerateGrid(Vertices, Triangles, FVector2D(Size.X, Size.Y), LengthSections, WidthSections, HeightValues);
 	FBox BoundingBox = FBox(FVector(0, 0, 0), Size);
 	MeshComponent->ClearAllMeshSections();
-	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Average);
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Infrequent);
 	MeshComponent->SetMaterial(0, Material);
 }
 

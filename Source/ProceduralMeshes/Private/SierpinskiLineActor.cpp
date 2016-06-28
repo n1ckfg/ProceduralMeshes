@@ -68,7 +68,7 @@ void ASierpinskiLineActor::GenerateMesh()
 	FBox BoundingBox = FBox(FVector(-LineThickness, -HalfSize - LineThickness, - LineThickness), FVector(Height + LineThickness, HalfSize + LineThickness, Height + LineThickness));
 
 	MeshComponent->ClearAllMeshSections();
-	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Average);
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Infrequent);
 	MeshComponent->SetMaterial(0, Material);
 }
 
