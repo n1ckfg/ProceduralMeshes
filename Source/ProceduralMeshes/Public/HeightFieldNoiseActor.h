@@ -5,8 +5,7 @@
 
 #include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
-#include "ProceduralMeshComponent.h"
-#include "ProceduralMeshData.h"
+#include "RuntimeMeshComponent.h"
 #include "HeightFieldNoiseActor.generated.h"
 
 UCLASS()
@@ -18,13 +17,7 @@ public:
 	AHeightFieldNoiseActor();
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Length = 1000.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Width = 1000.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
-	float Height = 20.0f;
+	FVector Size = FVector(1000.0f, 1000.0f, 20.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	int32 LengthSections = 100;
@@ -40,19 +33,28 @@ public:
 
 	virtual void BeginPlay() override;
 
-
 #if WITH_EDITOR
 	virtual void OnConstruction(const FTransform& Transform) override;
 #endif   // WITH_EDITOR
 
 protected:
-	UPROPERTY(Transient, DuplicateTransient)
-	UProceduralMeshComponent* ProcMesh;
+
+	UPROPERTY()
+	URuntimeMeshComponent* MeshComponent;
 
 private:
 	void GenerateMesh();
-	void GenerateGrid(FProceduralMeshData& MeshData, float InLength, float InWidth, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues);
+	void GeneratePoints();
+	void GenerateGrid(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues);
 
 	UPROPERTY(Transient)
 	FRandomStream RngStream = FRandomStream::FRandomStream();
+
+	TArray<float> HeightValues;
+
+	// Mesh buffers
+	void SetupMeshBuffers();
+	bool bHaveBuffersBeenInitialized = false;
+	TArray<FRuntimeMeshVertexSimple> Vertices;
+	TArray<int32> Triangles;
 };
