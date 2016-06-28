@@ -50,13 +50,7 @@ Normally (pun intended) this can be calculated easily from the vectors in the po
 A tangent is a vector that is perpendicular (forms a 90 degree angle) with the normal and is parallell to the polygon surface.
 
 ## Geometry examples
-I currently provide all the examples as actors because of a limitation with the ProceduralMeshComponent which I am using.
-
-ProceduralMeshComponent (PMC for short) is a useful plugin that ships with the Unreal Engine, but by default the mesh data is serialized which can cause your map sizes to baloon when you have a lot of procedurally generated meshes.
-
-To get around this limitation I forcefully mark the PMC as Transient so none of its data is ever saved.  If I were to create a component that inherits PMC, it would mean all the parameters we set on our mesh would also not be saved.
-
-I want to suggest to Epic to either change the mesh data to have a protected access modifier (so we can set the transient flag in the constructor), or change the default to not save the mesh data.
+At first this project was using Epic's ProceduralMeshComponent but I later converted it to using Koderz's excellent RuntimeMeshComponent.  See: https://github.com/Koderz/UE4RuntimeMeshComponent
 
 ##### Simple Cube
 We start off with a very simple example of drawing a cube where you can set the Depth, Width and Height dimensions.
