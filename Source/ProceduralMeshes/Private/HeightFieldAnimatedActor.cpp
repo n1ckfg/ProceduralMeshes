@@ -105,7 +105,7 @@ void AHeightFieldAnimatedActor::GenerateMesh()
 	MeshComponent->SetMaterial(0, Material);
 }
 
-void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
+void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& InVertices, TArray<int32>& InTriangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
 {
 	// Note the coordinates are a bit weird here since I aligned it to the transform (X is forwards or "up", which Y is to the right)
 	// Should really fix this up and use standard X, Y coords then transform into object space?
@@ -120,12 +120,12 @@ void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& V
 			// Create a new vertex
 			int32 NewVertIndex = VertexIndex++;
 			FVector newVertex = FVector(X * SectionSize.X, Y * SectionSize.Y, InHeightValues[NewVertIndex]);
-			Vertices[NewVertIndex].Position = newVertex;
+			InVertices[NewVertIndex].Position = newVertex;
 
 			// Note that Unreal UV origin (0,0) is top left
 			float U = (float)X / (float)InLengthSections;
 			float V = (float)Y / (float)InWidthSections;
-			Vertices[NewVertIndex].UV0 = FVector2D(U, V);
+			InVertices[NewVertIndex].UV0 = FVector2D(U, V);
 
 			// Once we've created enough verts we can start adding polygons
 			if (X > 0 && Y > 0)
@@ -140,13 +140,13 @@ void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& V
 
 				// Now create two triangles from those four vertices
 				// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-				Triangles[TriangleIndex++] = pBottomLeftIndex;
-				Triangles[TriangleIndex++] = bTopRightIndex;
-				Triangles[TriangleIndex++] = bTopLeftIndex;
+				InTriangles[TriangleIndex++] = pBottomLeftIndex;
+				InTriangles[TriangleIndex++] = bTopRightIndex;
+				InTriangles[TriangleIndex++] = bTopLeftIndex;
 
-				Triangles[TriangleIndex++] = pBottomLeftIndex;
-				Triangles[TriangleIndex++] = pBottomRightIndex;
-				Triangles[TriangleIndex++] = bTopRightIndex;
+				InTriangles[TriangleIndex++] = pBottomLeftIndex;
+				InTriangles[TriangleIndex++] = pBottomRightIndex;
+				InTriangles[TriangleIndex++] = bTopRightIndex;
 			}
 		}
 	}

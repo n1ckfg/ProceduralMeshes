@@ -80,7 +80,7 @@ void ASimpleCylinderActor::GenerateMesh()
 	MeshComponent->SetMaterial(0, Material);
 }
 
-void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, float InHeight, float InWidth, int32 InCrossSectionCount, bool bInCapEnds, bool bInDoubleSided, bool bInSmoothNormals/* = true*/)
+void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& InVertices, TArray<int32>& InTriangles, float InHeight, float InWidth, int32 InCrossSectionCount, bool bInCapEnds, bool bInDoubleSided, bool bInSmoothNormals/* = true*/)
 {
 	// -------------------------------------------------------
 	// Basic setup
@@ -111,29 +111,29 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 		int32 VertIndex3 = VertexIndex++;
 		int32 VertIndex4 = VertexIndex++;
 
-		Vertices[VertIndex1].Position = p0;
-		Vertices[VertIndex2].Position = p1;
-		Vertices[VertIndex3].Position = p2;
-		Vertices[VertIndex4].Position = p3;
+		InVertices[VertIndex1].Position = p0;
+		InVertices[VertIndex2].Position = p1;
+		InVertices[VertIndex3].Position = p2;
+		InVertices[VertIndex4].Position = p3;
 
 		// Now create two triangles from those four vertices
 		// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-		Triangles[TriangleIndex++] = VertIndex4;
-		Triangles[TriangleIndex++] = VertIndex3;
-		Triangles[TriangleIndex++] = VertIndex1;
+		InTriangles[TriangleIndex++] = VertIndex4;
+		InTriangles[TriangleIndex++] = VertIndex3;
+		InTriangles[TriangleIndex++] = VertIndex1;
 
-		Triangles[TriangleIndex++] = VertIndex3;
-		Triangles[TriangleIndex++] = VertIndex2;
-		Triangles[TriangleIndex++] = VertIndex1;
+		InTriangles[TriangleIndex++] = VertIndex3;
+		InTriangles[TriangleIndex++] = VertIndex2;
+		InTriangles[TriangleIndex++] = VertIndex1;
 
 		// UVs.  Note that Unreal UV origin (0,0) is top left
-		Vertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
-		Vertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
-		Vertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
-		Vertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
+		InVertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
+		InVertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
+		InVertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
+		InVertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
 
 		// Normals
-		FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
+		FVector NormalCurrent = FVector::CrossProduct(InVertices[VertIndex1].Position - InVertices[VertIndex3].Position, InVertices[VertIndex2].Position - InVertices[VertIndex3].Position).GetSafeNormal();
 
 		if (bInSmoothNormals)
 		{
@@ -156,21 +156,21 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 			FVector AverageNormalLeft = (NormalCurrent + NormalPrevious) / 2;
 			AverageNormalLeft = AverageNormalLeft.GetSafeNormal();
 
-			Vertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
-			Vertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
-			Vertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
-			Vertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
+			InVertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
+			InVertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
+			InVertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
+			InVertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
 		}
 		else
 		{
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
-			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
+			InVertices[VertIndex1].Normal = InVertices[VertIndex2].Normal = InVertices[VertIndex3].Normal = InVertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 		}
 
 		// Tangents (perpendicular to the surface)
 		FVector SurfaceTangent = p0 - p1;
 		SurfaceTangent = SurfaceTangent.GetSafeNormal();
-		Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
+		InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 
 		// -------------------------------------------------------
 		// If double sided, create extra polygons but face the normals the other way.
@@ -181,33 +181,33 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 			VertIndex3 = VertexIndex++;
 			VertIndex4 = VertexIndex++;
 
-			Vertices[VertIndex1].Position = p0;
-			Vertices[VertIndex2].Position = p1;
-			Vertices[VertIndex3].Position = p2;
-			Vertices[VertIndex4].Position = p3;
+			InVertices[VertIndex1].Position = p0;
+			InVertices[VertIndex2].Position = p1;
+			InVertices[VertIndex3].Position = p2;
+			InVertices[VertIndex4].Position = p3;
 
 			// Reverse the poly order to face them the other way
-			Triangles[TriangleIndex++] = VertIndex4;
-			Triangles[TriangleIndex++] = VertIndex1;
-			Triangles[TriangleIndex++] = VertIndex3;
+			InTriangles[TriangleIndex++] = VertIndex4;
+			InTriangles[TriangleIndex++] = VertIndex1;
+			InTriangles[TriangleIndex++] = VertIndex3;
 
-			Triangles[TriangleIndex++] = VertIndex3;
-			Triangles[TriangleIndex++] = VertIndex1;
-			Triangles[TriangleIndex++] = VertIndex2;
+			InTriangles[TriangleIndex++] = VertIndex3;
+			InTriangles[TriangleIndex++] = VertIndex1;
+			InTriangles[TriangleIndex++] = VertIndex2;
 
 			// UVs  (Unreal 1,1 is top left)
-			Vertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
-			Vertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
-			Vertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
-			Vertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
+			InVertices[VertIndex1].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 1.0f);
+			InVertices[VertIndex2].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 1.0f);
+			InVertices[VertIndex3].UV0 = FVector2D(1.0f - (VMapPerQuad * (QuadIndex + 1)), 0.0f);
+			InVertices[VertIndex4].UV0 = FVector2D(1.0f - (VMapPerQuad * QuadIndex), 0.0f);
 
 			// Just simple (unsmoothed) normal for these
-			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
+			InVertices[VertIndex1].Normal = InVertices[VertIndex2].Normal = InVertices[VertIndex3].Normal = InVertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 
 			// Tangents (perpendicular to the surface)
-			FVector SurfaceTangent = p0 - p1;
-			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
+			FVector SurfaceTangentDbl = p0 - p1;
+			SurfaceTangentDbl = SurfaceTangentDbl.GetSafeNormal();
+			InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangentDbl);
 		}
 
 		// -------------------------------------------------------
@@ -223,25 +223,25 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 			VertIndex1 = VertexIndex++;
 			VertIndex2 = VertexIndex++;
 			VertIndex3 = VertexIndex++;
-			Vertices[VertIndex1].Position = capVertex0;
-			Vertices[VertIndex2].Position = capVertex1;
-			Vertices[VertIndex3].Position = capVertex2;
+			InVertices[VertIndex1].Position = capVertex0;
+			InVertices[VertIndex2].Position = capVertex1;
+			InVertices[VertIndex3].Position = capVertex2;
 
-			Triangles[TriangleIndex++] = VertIndex1;
-			Triangles[TriangleIndex++] = VertIndex2;
-			Triangles[TriangleIndex++] = VertIndex3;
+			InTriangles[TriangleIndex++] = VertIndex1;
+			InTriangles[TriangleIndex++] = VertIndex2;
+			InTriangles[TriangleIndex++] = VertIndex3;
 
-			Vertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
-			Vertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(-Angle) / 2.0f), 0.5f - (FMath::Sin(-Angle) / 2.0f));
-			Vertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(-NextAngle) / 2.0f), 0.5f - (FMath::Sin(-NextAngle) / 2.0f));
+			InVertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
+			InVertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(-Angle) / 2.0f), 0.5f - (FMath::Sin(-Angle) / 2.0f));
+			InVertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(-NextAngle) / 2.0f), 0.5f - (FMath::Sin(-NextAngle) / 2.0f));
 
-			FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
-			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = FPackedNormal(NormalCurrent);
+			FVector CapNormalCurrent = FVector::CrossProduct(InVertices[VertIndex1].Position - InVertices[VertIndex3].Position, InVertices[VertIndex2].Position - InVertices[VertIndex3].Position).GetSafeNormal();
+			InVertices[VertIndex1].Normal = InVertices[VertIndex2].Normal = InVertices[VertIndex3].Normal = FPackedNormal(CapNormalCurrent);
 
 			// Tangents (perpendicular to the surface)
-			FVector SurfaceTangent = p0 - p1;
-			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangent);
+			FVector SurfaceTangentCap = p0 - p1;
+			SurfaceTangentCap = SurfaceTangentCap.GetSafeNormal();
+			InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangentCap);
 
 			// Top cap
 			capVertex0 = capVertex0 + Offset;
@@ -251,25 +251,25 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 			VertIndex1 = VertexIndex++;
 			VertIndex2 = VertexIndex++;
 			VertIndex3 = VertexIndex++;
-			Vertices[VertIndex1].Position = capVertex0;
-			Vertices[VertIndex2].Position = capVertex1;
-			Vertices[VertIndex3].Position = capVertex2;
+			InVertices[VertIndex1].Position = capVertex0;
+			InVertices[VertIndex2].Position = capVertex1;
+			InVertices[VertIndex3].Position = capVertex2;
 
-			Triangles[TriangleIndex++] = VertIndex3;
-			Triangles[TriangleIndex++] = VertIndex2;
-			Triangles[TriangleIndex++] = VertIndex1;
+			InTriangles[TriangleIndex++] = VertIndex3;
+			InTriangles[TriangleIndex++] = VertIndex2;
+			InTriangles[TriangleIndex++] = VertIndex1;
 
-			Vertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
-			Vertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(Angle) / 2.0f), 0.5f - (FMath::Sin(Angle) / 2.0f));
-			Vertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(NextAngle) / 2.0f), 0.5f - (FMath::Sin(NextAngle) / 2.0f));
+			InVertices[VertIndex1].UV0 = FVector2D(0.5f - (FMath::Cos(0) / 2.0f), 0.5f - (FMath::Sin(0) / 2.0f));
+			InVertices[VertIndex2].UV0 = FVector2D(0.5f - (FMath::Cos(Angle) / 2.0f), 0.5f - (FMath::Sin(Angle) / 2.0f));
+			InVertices[VertIndex3].UV0 = FVector2D(0.5f - (FMath::Cos(NextAngle) / 2.0f), 0.5f - (FMath::Sin(NextAngle) / 2.0f));
 
-			NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
-			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = FPackedNormal(NormalCurrent);
+			CapNormalCurrent = FVector::CrossProduct(InVertices[VertIndex1].Position - InVertices[VertIndex3].Position, InVertices[VertIndex2].Position - InVertices[VertIndex3].Position).GetSafeNormal();
+			InVertices[VertIndex1].Normal = InVertices[VertIndex2].Normal = InVertices[VertIndex3].Normal = FPackedNormal(CapNormalCurrent);
 
 			// Tangents (perpendicular to the surface)
-			SurfaceTangent = p0 - p1;
-			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangent);
+			SurfaceTangentCap = p0 - p1;
+			SurfaceTangentCap = SurfaceTangentCap.GetSafeNormal();
+			InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = FPackedNormal(SurfaceTangentCap);
 		}
 	}
 }

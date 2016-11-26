@@ -180,7 +180,7 @@ void ASierpinskiLineActor::AddSection(FVector InBottomLeftPoint, FVector InTopPo
 	AddSection(BottomLeftPoint, MiddlePointUp, BottomRightPoint, InBottomMiddlePoint, InDepth + 1); // Lower middle pyramid
 }
 
-void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32& VertexIndex, int32& TriangleIndex, bool bInSmoothNormals/* = true*/)
+void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& InVertices, TArray<int32>& InTriangles, FVector StartPoint, FVector EndPoint, float InWidth, int32 InCrossSectionCount, int32& VertexIndex, int32& TriangleIndex, bool bInSmoothNormals/* = true*/)
 {
 	// Make a cylinder section
 	const float AngleBetweenQuads = (2.0f / (float)(InCrossSectionCount)) * PI;
@@ -214,29 +214,29 @@ void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 		int32 VertIndex3 = VertexIndex++;
 		int32 VertIndex4 = VertexIndex++;
 
-		Vertices[VertIndex1].Position = p0;
-		Vertices[VertIndex2].Position = p1;
-		Vertices[VertIndex3].Position = p2;
-		Vertices[VertIndex4].Position = p3;
+		InVertices[VertIndex1].Position = p0;
+		InVertices[VertIndex2].Position = p1;
+		InVertices[VertIndex3].Position = p2;
+		InVertices[VertIndex4].Position = p3;
 
 		// Now create two triangles from those four vertices
 		// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-		Triangles[TriangleIndex++] = VertIndex4;
-		Triangles[TriangleIndex++] = VertIndex3;
-		Triangles[TriangleIndex++] = VertIndex1;
+		InTriangles[TriangleIndex++] = VertIndex4;
+		InTriangles[TriangleIndex++] = VertIndex3;
+		InTriangles[TriangleIndex++] = VertIndex1;
 
-		Triangles[TriangleIndex++] = VertIndex3;
-		Triangles[TriangleIndex++] = VertIndex2;
-		Triangles[TriangleIndex++] = VertIndex1;
+		InTriangles[TriangleIndex++] = VertIndex3;
+		InTriangles[TriangleIndex++] = VertIndex2;
+		InTriangles[TriangleIndex++] = VertIndex1;
 
 		// UVs.  Note that Unreal UV origin (0,0) is top left
-		Vertices[VertIndex1].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 1.0f);
-		Vertices[VertIndex2].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 1.0f);
-		Vertices[VertIndex3].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 0.0f);
-		Vertices[VertIndex4].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 0.0f);
+		InVertices[VertIndex1].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 1.0f);
+		InVertices[VertIndex2].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 1.0f);
+		InVertices[VertIndex3].UV0 = FVector2D(1.0f - (UMapPerQuad * (QuadIndex + 1)), 0.0f);
+		InVertices[VertIndex4].UV0 = FVector2D(1.0f - (UMapPerQuad * QuadIndex), 0.0f);
 
 		// Normals
-		FVector NormalCurrent = FVector::CrossProduct(Vertices[VertIndex1].Position - Vertices[VertIndex3].Position, Vertices[VertIndex2].Position - Vertices[VertIndex3].Position).GetSafeNormal();
+		FVector NormalCurrent = FVector::CrossProduct(InVertices[VertIndex1].Position - InVertices[VertIndex3].Position, InVertices[VertIndex2].Position - InVertices[VertIndex3].Position).GetSafeNormal();
 
 		if (bInSmoothNormals)
 		{
@@ -261,20 +261,20 @@ void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& Ve
 			FVector AverageNormalLeft = (NormalCurrent + NormalPrevious) / 2;
 			AverageNormalLeft = AverageNormalLeft.GetSafeNormal();
 
-			Vertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
-			Vertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
-			Vertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
-			Vertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
+			InVertices[VertIndex1].Normal = FPackedNormal(AverageNormalLeft);
+			InVertices[VertIndex2].Normal = FPackedNormal(AverageNormalRight);
+			InVertices[VertIndex3].Normal = FPackedNormal(AverageNormalRight);
+			InVertices[VertIndex4].Normal = FPackedNormal(AverageNormalLeft);
 		}
 		else
 		{
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
-			Vertices[VertIndex1].Normal = Vertices[VertIndex2].Normal = Vertices[VertIndex3].Normal = Vertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
+			InVertices[VertIndex1].Normal = InVertices[VertIndex2].Normal = InVertices[VertIndex3].Normal = InVertices[VertIndex4].Normal = FPackedNormal(NormalCurrent);
 		}
 
 		// Tangents (perpendicular to the surface)
 		FVector SurfaceTangent = p0 - p1;
 		SurfaceTangent = SurfaceTangent.GetSafeNormal();
-		Vertices[VertIndex1].Tangent = Vertices[VertIndex2].Tangent = Vertices[VertIndex3].Tangent = Vertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
+		InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 	}
 }

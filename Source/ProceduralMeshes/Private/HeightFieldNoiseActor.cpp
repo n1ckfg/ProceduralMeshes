@@ -80,7 +80,7 @@ void AHeightFieldNoiseActor::GenerateMesh()
 	MeshComponent->SetMaterial(0, Material);
 }
 
-void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& Vertices, TArray<int32>& Triangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
+void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& InVertices, TArray<int32>& InTriangles, FVector2D InSize, int32 InLengthSections, int32 InWidthSections, const TArray<float>& InHeightValues)
 {
 	// Note the coordinates are a bit weird here since I aligned it to the transform (X is forwards or "up", which Y is to the right)
 	// Should really fix this up and use standard X, Y coords then transform into object space?
@@ -108,37 +108,37 @@ void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& Vert
 			FVector pTopRight = FVector((X + 1) * SectionSize.X, (Y + 1) * SectionSize.Y, InHeightValues[NoiseIndex_TopRight]);
 			FVector pTopLeft = FVector((X+1) * SectionSize.X, Y * SectionSize.Y, InHeightValues[NoiseIndex_TopLeft]);
 			
-			Vertices[BottomLeftIndex].Position = pBottomLeft;
-			Vertices[BottomRightIndex].Position = pBottomRight;
-			Vertices[TopRightIndex].Position = pTopRight;
-			Vertices[TopLeftIndex].Position = pTopLeft;
+			InVertices[BottomLeftIndex].Position = pBottomLeft;
+			InVertices[BottomRightIndex].Position = pBottomRight;
+			InVertices[TopRightIndex].Position = pTopRight;
+			InVertices[TopLeftIndex].Position = pTopLeft;
 
 			// Note that Unreal UV origin (0,0) is top left
-			Vertices[BottomLeftIndex].UV0 = FVector2D((float)X / (float)InLengthSections, (float)Y / (float)InWidthSections);
-			Vertices[BottomRightIndex].UV0 = FVector2D((float)X / (float)InLengthSections, (float)(Y+1) / (float)InWidthSections);
-			Vertices[TopRightIndex].UV0 = FVector2D((float)(X+1) / (float)InLengthSections, (float)(Y+1) / (float)InWidthSections);
-			Vertices[TopLeftIndex].UV0 = FVector2D((float)(X+1) / (float)InLengthSections, (float)Y / (float)InWidthSections);
+			InVertices[BottomLeftIndex].UV0 = FVector2D((float)X / (float)InLengthSections, (float)Y / (float)InWidthSections);
+			InVertices[BottomRightIndex].UV0 = FVector2D((float)X / (float)InLengthSections, (float)(Y+1) / (float)InWidthSections);
+			InVertices[TopRightIndex].UV0 = FVector2D((float)(X+1) / (float)InLengthSections, (float)(Y+1) / (float)InWidthSections);
+			InVertices[TopLeftIndex].UV0 = FVector2D((float)(X+1) / (float)InLengthSections, (float)Y / (float)InWidthSections);
 
 			// Now create two triangles from those four vertices
 			// The order of these (clockwise/counter-clockwise) dictates which way the normal will face. 
-			Triangles[TriangleIndex++] = BottomLeftIndex;
-			Triangles[TriangleIndex++] = TopRightIndex;
-			Triangles[TriangleIndex++] = TopLeftIndex;
+			InTriangles[TriangleIndex++] = BottomLeftIndex;
+			InTriangles[TriangleIndex++] = TopRightIndex;
+			InTriangles[TriangleIndex++] = TopLeftIndex;
 
-			Triangles[TriangleIndex++] = BottomLeftIndex;
-			Triangles[TriangleIndex++] = BottomRightIndex;
-			Triangles[TriangleIndex++] = TopRightIndex;
+			InTriangles[TriangleIndex++] = BottomLeftIndex;
+			InTriangles[TriangleIndex++] = BottomRightIndex;
+			InTriangles[TriangleIndex++] = TopRightIndex;
 
 			// Normals
-			FVector NormalCurrent = FVector::CrossProduct(Vertices[BottomLeftIndex].Position - Vertices[TopLeftIndex].Position, Vertices[TopRightIndex].Position - Vertices[TopLeftIndex].Position).GetSafeNormal();
+			FVector NormalCurrent = FVector::CrossProduct(InVertices[BottomLeftIndex].Position - InVertices[TopLeftIndex].Position, InVertices[TopRightIndex].Position - InVertices[TopLeftIndex].Position).GetSafeNormal();
 
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
-			Vertices[BottomLeftIndex].Normal = Vertices[BottomRightIndex].Normal = Vertices[TopRightIndex].Normal = Vertices[TopLeftIndex].Normal = FPackedNormal(NormalCurrent);
+			InVertices[BottomLeftIndex].Normal = InVertices[BottomRightIndex].Normal = InVertices[TopRightIndex].Normal = InVertices[TopLeftIndex].Normal = FPackedNormal(NormalCurrent);
 
 			// Tangents (perpendicular to the surface)
 			FVector SurfaceTangent = pBottomLeft - pBottomRight;
 			SurfaceTangent = SurfaceTangent.GetSafeNormal();
-			Vertices[BottomLeftIndex].Tangent = Vertices[BottomRightIndex].Tangent = Vertices[TopRightIndex].Tangent = Vertices[TopLeftIndex].Tangent = FPackedNormal(SurfaceTangent);
+			InVertices[BottomLeftIndex].Tangent = InVertices[BottomRightIndex].Tangent = InVertices[TopRightIndex].Tangent = InVertices[TopLeftIndex].Tangent = FPackedNormal(SurfaceTangent);
 		}
 	}
 }
