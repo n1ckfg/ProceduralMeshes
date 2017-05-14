@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 // Example cylinder mesh
 
 #pragma once
@@ -38,10 +39,13 @@ public:
 	UMaterialInterface* Material;
 
 	virtual void BeginPlay() override;
+	virtual void PostLoad() override;
+	virtual void PostActorCreated() override;
 
 #if WITH_EDITOR
-	virtual void OnConstruction(const FTransform& Transform) override;
-#endif   // WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif // WITH_EDITOR
+
 
 protected:
 	

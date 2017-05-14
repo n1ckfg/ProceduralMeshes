@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 // Example cylinder strip mesh
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -12,24 +13,25 @@ ACylinderStripActor::ACylinderStripActor()
 	MeshComponent->SetupAttachment(RootComponent);
 }
 
-#if WITH_EDITOR  
-void ACylinderStripActor::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	PreCacheCrossSection();
-	
-	// We need to re-construct the buffers since values can be changed in editor
-	Vertices.Empty();
-	Triangles.Empty();
-	SetupMeshBuffers();
-
-	GenerateMesh();
-}
-#endif // WITH_EDITOR
-
 void ACylinderStripActor::BeginPlay()
 {
 	Super::BeginPlay();
+	PreCacheCrossSection();
+	GenerateMesh();
+}
+
+// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
+void ACylinderStripActor::PostActorCreated()
+{
+	Super::PostActorCreated();
+	PreCacheCrossSection();
+	GenerateMesh();
+}
+
+// This is called when actor is already in level and map is opened
+void ACylinderStripActor::PostLoad()
+{
+	Super::PostLoad();
 	PreCacheCrossSection();
 	GenerateMesh();
 }
@@ -246,3 +248,32 @@ void ACylinderStripActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& InV
 		InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 	}
 }
+
+#if WITH_EDITOR
+void ACylinderStripActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
+
+	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ACylinderStripActor, Radius)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ACylinderStripActor, bSmoothNormals)))
+	{
+		// Same vert count, so just regen mesh with same buffers
+		PreCacheCrossSection();
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ACylinderStripActor, RadialSegmentCount)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ACylinderStripActor, LinePoints)))
+	{
+		// Vertice count has changed, so reset buffer and then regen mesh
+		PreCacheCrossSection();
+		Vertices.Empty();
+		Triangles.Empty();
+		SetupMeshBuffers();
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ACylinderStripActor, Material)))
+	{
+		MeshComponent->SetMaterial(0, Material);
+	}
+}
+#endif // WITH_EDITOR

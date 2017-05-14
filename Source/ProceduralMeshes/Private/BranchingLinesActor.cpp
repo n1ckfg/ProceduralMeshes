@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 // Example branching lines using cylinder strips
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -16,23 +17,25 @@ ABranchingLinesActor::ABranchingLinesActor()
 	OffsetDirections.Add(FVector(0, 0, 1));
 }
 
-#if WITH_EDITOR  
-void ABranchingLinesActor::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	PreCacheCrossSection();
-	
-	// We need to re-construct the buffers since values can be changed in editor
-	Vertices.Empty();
-	Triangles.Empty();
-	bHaveBuffersBeenInitialized = false;
-	GenerateMesh();
-}
-#endif // WITH_EDITOR
-
 void ABranchingLinesActor::BeginPlay()
 {
 	Super::BeginPlay();
+	PreCacheCrossSection();
+	GenerateMesh();
+}
+
+// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
+void ABranchingLinesActor::PostActorCreated()
+{
+	Super::PostActorCreated();
+	PreCacheCrossSection();
+	GenerateMesh();
+}
+
+// This is called when actor is already in level and map is opened
+void ABranchingLinesActor::PostLoad()
+{
+	Super::PostLoad();
 	PreCacheCrossSection();
 	GenerateMesh();
 }
@@ -332,3 +335,40 @@ void ABranchingLinesActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& In
 		InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 	}
 }
+
+
+#if WITH_EDITOR
+void ABranchingLinesActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
+
+	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, TrunkWidth))
+		|| (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, WidthReductionOnFork))
+		|| (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, bSmoothNormals))
+		|| (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, BranchOffsetReductionEachGenerationPercentage))
+		|| (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, ForkLengthMin))
+		|| (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, ForkLengthMax)))
+	{
+		// Same vert count, so just regen mesh with same buffers
+		PreCacheCrossSection();
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ABranchingLinesActor, Material)))
+	{
+		MeshComponent->SetMaterial(0, Material);
+	}
+	// Pretty much everything else changes the vert counts
+	else
+	{
+		// Vertice count has changed, so reset buffer and then regen mesh
+		PreCacheCrossSection();
+		Vertices.Empty();
+		Triangles.Empty();
+		bHaveBuffersBeenInitialized = false;
+		GenerateMesh();
+	}
+	
+}
+#endif // WITH_EDITOR

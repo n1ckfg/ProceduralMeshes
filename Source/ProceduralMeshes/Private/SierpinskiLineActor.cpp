@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 // Example Sierpinski pyramid using cylinder lines
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -12,24 +13,27 @@ ASierpinskiLineActor::ASierpinskiLineActor()
 	MeshComponent->SetupAttachment(RootComponent);
 }
 
-#if WITH_EDITOR  
-void ASierpinskiLineActor::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	PreCacheCrossSection();
-
-	// We need to re-construct the buffers since values can be changed in editor
-	Vertices.Empty();
-	Triangles.Empty();
-	bHaveBuffersBeenInitialized = false;
-	GenerateLines();
-	GenerateMesh();
-}
-#endif // WITH_EDITOR
-
 void ASierpinskiLineActor::BeginPlay()
 {
 	Super::BeginPlay();
+	PreCacheCrossSection();
+	GenerateLines();
+	GenerateMesh();
+}
+
+// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
+void ASierpinskiLineActor::PostActorCreated()
+{
+	Super::PostActorCreated();
+	PreCacheCrossSection();
+	GenerateLines();
+	GenerateMesh();
+}
+
+// This is called when actor is already in level and map is opened
+void ASierpinskiLineActor::PostLoad()
+{
+	Super::PostLoad();
 	PreCacheCrossSection();
 	GenerateLines();
 	GenerateMesh();
@@ -278,3 +282,34 @@ void ASierpinskiLineActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& In
 		InVertices[VertIndex1].Tangent = InVertices[VertIndex2].Tangent = InVertices[VertIndex3].Tangent = InVertices[VertIndex4].Tangent = FPackedNormal(SurfaceTangent);
 	}
 }
+
+#if WITH_EDITOR
+void ASierpinskiLineActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
+
+	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, Size)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, LineThickness)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, ThicknessMultiplierPerGeneration)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, bSmoothNormals)))
+	{
+		// Same vert count, so just regen mesh with same buffers
+		PreCacheCrossSection();
+		GenerateLines();
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, Iterations)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, RadialSegmentCount)))
+	{
+		// Vertice count has changed, so reset buffer and then regen mesh
+		PreCacheCrossSection();
+		Vertices.Empty();
+		Triangles.Empty();
+		bHaveBuffersBeenInitialized = false;
+		GenerateLines();
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASierpinskiLineActor, Material)))
+	{
+		MeshComponent->SetMaterial(0, Material);
+	}
+}
+#endif // WITH_EDITOR

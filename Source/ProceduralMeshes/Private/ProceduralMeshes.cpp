@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 
 #include "ProceduralMeshesPrivatePCH.h"
 

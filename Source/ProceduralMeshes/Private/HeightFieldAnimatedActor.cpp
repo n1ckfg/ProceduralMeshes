@@ -1,4 +1,5 @@
-// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
+// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
 // Example heightfield grid animated with sine and cosine waves
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -14,23 +15,23 @@ AHeightFieldAnimatedActor::AHeightFieldAnimatedActor()
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-#if WITH_EDITOR  
-void AHeightFieldAnimatedActor::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-	
-	// We need to re-construct the buffers since values can be changed in editor
-	Vertices.Empty();
-	Triangles.Empty();
-	HeightValues.Empty();
-	bHaveBuffersBeenInitialized = false;
-	GenerateMesh();
-}
-#endif // WITH_EDITOR
-
 void AHeightFieldAnimatedActor::BeginPlay()
 {
 	Super::BeginPlay();
+	GenerateMesh();
+}
+
+// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
+void AHeightFieldAnimatedActor::PostActorCreated()
+{
+	Super::PostActorCreated();
+	GenerateMesh();
+}
+
+// This is called when actor is already in level and map is opened
+void AHeightFieldAnimatedActor::PostLoad()
+{
+	Super::PostLoad();
 	GenerateMesh();
 }
 
@@ -151,3 +152,31 @@ void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& I
 		}
 	}
 }
+
+#if WITH_EDITOR
+void AHeightFieldAnimatedActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+
+	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
+
+	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldAnimatedActor, Size)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldAnimatedActor, ScaleFactor)))
+	{
+		// Same vert count, so just regen mesh with same buffers
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldAnimatedActor, LengthSections)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldAnimatedActor, WidthSections)))
+	{
+		// Vertice count has changed, so reset buffer and then regen mesh
+		Vertices.Empty();
+		Triangles.Empty();
+		HeightValues.Empty();
+		bHaveBuffersBeenInitialized = false;
+		GenerateMesh();
+	}
+	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldAnimatedActor, Material)))
+	{
+		MeshComponent->SetMaterial(0, Material);
+	}
+}
+#endif // WITH_EDITOR
