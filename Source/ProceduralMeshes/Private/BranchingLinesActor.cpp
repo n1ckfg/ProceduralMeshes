@@ -7,7 +7,9 @@
 
 ABranchingLinesActor::ABranchingLinesActor()
 {
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RootNode = CreateDefaultSubobject<USceneComponent>("Root");
+	RootComponent = RootNode;
+
 	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
 	MeshComponent->bShouldSerializeMeshData = false;
 	MeshComponent->SetupAttachment(RootComponent);
@@ -15,13 +17,6 @@ ABranchingLinesActor::ABranchingLinesActor()
 	// Setup random offset directions
 	OffsetDirections.Add(FVector(1, 0, 0));
 	OffsetDirections.Add(FVector(0, 0, 1));
-}
-
-void ABranchingLinesActor::BeginPlay()
-{
-	Super::BeginPlay();
-	PreCacheCrossSection();
-	GenerateMesh();
 }
 
 // This is called when actor is spawned (at runtime or when you drop it into the world in editor)

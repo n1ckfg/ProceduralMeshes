@@ -7,18 +7,12 @@
 
 ASierpinskiLineActor::ASierpinskiLineActor()
 {
-	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
+	RootNode = CreateDefaultSubobject<USceneComponent>("Root");
+	RootComponent = RootNode;
+
 	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
 	MeshComponent->bShouldSerializeMeshData = false;
 	MeshComponent->SetupAttachment(RootComponent);
-}
-
-void ASierpinskiLineActor::BeginPlay()
-{
-	Super::BeginPlay();
-	PreCacheCrossSection();
-	GenerateLines();
-	GenerateMesh();
 }
 
 // This is called when actor is spawned (at runtime or when you drop it into the world in editor)

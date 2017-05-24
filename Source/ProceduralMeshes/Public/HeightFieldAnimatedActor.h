@@ -41,7 +41,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	float AnimationSpeedY = 4.5f;
 
-	virtual void BeginPlay() override;
 	virtual void PostLoad() override;
 	virtual void PostActorCreated() override;
 
@@ -52,6 +51,9 @@ public:
 #endif // WITH_EDITOR
 
 protected:
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Default)
+	USceneComponent* RootNode;
 
 	UPROPERTY()
 	URuntimeMeshComponent* MeshComponent;

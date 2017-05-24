@@ -120,7 +120,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	UMaterialInterface* Material;
 
-	virtual void BeginPlay() override;
 	virtual void PostLoad() override;
 	virtual void PostActorCreated() override;
 
@@ -129,6 +128,9 @@ public:
 #endif // WITH_EDITOR
 
 protected:
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Default)
+	USceneComponent* RootNode;
 
 	UPROPERTY()
 	URuntimeMeshComponent* MeshComponent;
