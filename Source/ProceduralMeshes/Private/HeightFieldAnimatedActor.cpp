@@ -98,7 +98,7 @@ void AHeightFieldAnimatedActor::GenerateMesh()
 	GenerateGrid(Vertices, Triangles, FVector2D(Size.X, Size.Y), LengthSections, WidthSections, HeightValues);
 	FBox BoundingBox = FBox(FVector(0, 0, -MaxHeightValue), FVector(Size.X, Size.Y, MaxHeightValue));
 	MeshComponent->ClearAllMeshSections();
-	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Infrequent);
+	MeshComponent->CreateMeshSection(0, Vertices, Triangles, BoundingBox, false, EUpdateFrequency::Frequent);
 	MeshComponent->SetMaterial(0, Material);
 }
 
@@ -144,6 +144,10 @@ void AHeightFieldAnimatedActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& I
 				InTriangles[TriangleIndex++] = pBottomLeftIndex;
 				InTriangles[TriangleIndex++] = pBottomRightIndex;
 				InTriangles[TriangleIndex++] = bTopRightIndex;
+
+				// Normals
+				FVector NormalCurrent = FVector::CrossProduct(InVertices[pBottomLeftIndex].Position - InVertices[bTopLeftIndex].Position, InVertices[bTopLeftIndex].Position - InVertices[bTopRightIndex].Position).GetSafeNormal();
+				InVertices[pBottomLeftIndex].Normal = InVertices[pBottomRightIndex].Normal = InVertices[bTopRightIndex].Normal = InVertices[bTopLeftIndex].Normal = FPackedNormal(NormalCurrent);
 			}
 		}
 	}

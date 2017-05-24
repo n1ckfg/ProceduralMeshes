@@ -127,7 +127,7 @@ void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& InVe
 			InTriangles[TriangleIndex++] = TopRightIndex;
 
 			// Normals
-			FVector NormalCurrent = FVector::CrossProduct(InVertices[BottomLeftIndex].Position - InVertices[TopLeftIndex].Position, InVertices[TopRightIndex].Position - InVertices[TopLeftIndex].Position).GetSafeNormal();
+			FVector NormalCurrent = FVector::CrossProduct(InVertices[BottomLeftIndex].Position - InVertices[TopLeftIndex].Position, InVertices[TopLeftIndex].Position - InVertices[TopRightIndex].Position).GetSafeNormal();
 
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
 			InVertices[BottomLeftIndex].Normal = InVertices[BottomRightIndex].Normal = InVertices[TopRightIndex].Normal = InVertices[TopLeftIndex].Normal = FPackedNormal(NormalCurrent);
