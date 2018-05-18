@@ -1,9 +1,9 @@
-// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
-// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
+// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
 // Example cylinder mesh
 
 #pragma once
 
+#include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
 #include "RuntimeMeshComponent.h"
 #include "SimpleCylinderActor.generated.h"
@@ -37,19 +37,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	UMaterialInterface* Material;
 
-	virtual void PostLoad() override;
-	virtual void PostActorCreated() override;
+	virtual void BeginPlay() override;
 
 #if WITH_EDITOR
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif // WITH_EDITOR
-
+	virtual void OnConstruction(const FTransform& Transform) override;
+#endif   // WITH_EDITOR
 
 protected:
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Default)
-	USceneComponent* RootNode;
-
 	UPROPERTY()
 	URuntimeMeshComponent* MeshComponent;
 

@@ -1,9 +1,9 @@
-// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
-// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
+// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
 // Example heightfield grid animated with sine and cosine waves
 
 #pragma once
 
+#include "ProceduralMeshesPrivatePCH.h"
 #include "GameFramework/Actor.h"
 #include "RuntimeMeshComponent.h"
 #include "HeightFieldAnimatedActor.generated.h"
@@ -29,6 +29,9 @@ public:
 	int32 WidthSections = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
+	int32 RandomSeed = 1238;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	UMaterialInterface* Material;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
@@ -40,19 +43,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Procedural Parameters")
 	float AnimationSpeedY = 4.5f;
 
-	virtual void PostLoad() override;
-	virtual void PostActorCreated() override;
+	virtual void BeginPlay() override;
 
 	virtual void Tick(float DeltaSeconds) override;
 
 #if WITH_EDITOR
-	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif // WITH_EDITOR
+	virtual void OnConstruction(const FTransform& Transform) override;
+#endif   // WITH_EDITOR
 
 protected:
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Default)
-	USceneComponent* RootNode;
 
 	UPROPERTY()
 	URuntimeMeshComponent* MeshComponent;

@@ -1,5 +1,4 @@
-// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
-// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
+// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
 // Example cylinder mesh
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -7,25 +6,29 @@
 
 ASimpleCylinderActor::ASimpleCylinderActor()
 {
-	RootNode = CreateDefaultSubobject<USceneComponent>("Root");
-	RootComponent = RootNode;
-
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
 	MeshComponent->bShouldSerializeMeshData = false;
 	MeshComponent->SetupAttachment(RootComponent);
 }
 
-// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
-void ASimpleCylinderActor::PostActorCreated()
+#if WITH_EDITOR  
+void ASimpleCylinderActor::OnConstruction(const FTransform& Transform)
 {
-	Super::PostActorCreated();
+	Super::OnConstruction(Transform);
+
+	// We need to re-construct the buffers since values can be changed in editor
+	Vertices.Empty();
+	Triangles.Empty();
+	SetupMeshBuffers();
+
 	GenerateMesh();
 }
+#endif // WITH_EDITOR
 
-// This is called when actor is already in level and map is opened
-void ASimpleCylinderActor::PostLoad()
+void ASimpleCylinderActor::BeginPlay()
 {
-	Super::PostLoad();
+	Super::BeginPlay();
 	GenerateMesh();
 }
 
@@ -270,30 +273,3 @@ void ASimpleCylinderActor::GenerateCylinder(TArray<FRuntimeMeshVertexSimple>& In
 		}
 	}
 }
-
-#if WITH_EDITOR
-void ASimpleCylinderActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
-
-	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, Radius)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, Height)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, bSmoothNormals)))
-	{
-		// Same vert count, so just regen mesh with same buffers
-		GenerateMesh();
-	}
-	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, RadialSegmentCount)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, bCapEnds)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, bDoubleSided)))
-	{
-		// Vertice count has changed, so reset buffer and then regen mesh
-		Vertices.Empty();
-		Triangles.Empty();
-		SetupMeshBuffers();
-		GenerateMesh();
-	}
-	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCylinderActor, Material)))
-	{
-		MeshComponent->SetMaterial(0, Material);
-	}
-}
-#endif // WITH_EDITOR

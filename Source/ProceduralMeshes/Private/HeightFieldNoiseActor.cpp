@@ -1,5 +1,4 @@
-// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
-// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
+// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
 // Example heightfield generated with noise
 
 #include "ProceduralMeshesPrivatePCH.h"
@@ -7,25 +6,29 @@
 
 AHeightFieldNoiseActor::AHeightFieldNoiseActor()
 {
-	RootNode = CreateDefaultSubobject<USceneComponent>("Root");
-	RootComponent = RootNode;
-
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
 	MeshComponent->bShouldSerializeMeshData = false;
 	MeshComponent->SetupAttachment(RootComponent);
 }
 
-// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
-void AHeightFieldNoiseActor::PostActorCreated()
+#if WITH_EDITOR  
+void AHeightFieldNoiseActor::OnConstruction(const FTransform& Transform)
 {
-	Super::PostActorCreated();
+	Super::OnConstruction(Transform);
+
+	// We need to re-construct the buffers since values can be changed in editor
+	Vertices.Empty();
+	Triangles.Empty();
+	HeightValues.Empty();
+	bHaveBuffersBeenInitialized = false;
 	GenerateMesh();
 }
+#endif // WITH_EDITOR
 
-// This is called when actor is already in level and map is opened
-void AHeightFieldNoiseActor::PostLoad()
+void AHeightFieldNoiseActor::BeginPlay()
 {
-	Super::PostLoad();
+	Super::BeginPlay();
 	GenerateMesh();
 }
 
@@ -127,7 +130,7 @@ void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& InVe
 			InTriangles[TriangleIndex++] = TopRightIndex;
 
 			// Normals
-			FVector NormalCurrent = FVector::CrossProduct(InVertices[BottomLeftIndex].Position - InVertices[TopLeftIndex].Position, InVertices[TopLeftIndex].Position - InVertices[TopRightIndex].Position).GetSafeNormal();
+			FVector NormalCurrent = FVector::CrossProduct(InVertices[BottomLeftIndex].Position - InVertices[TopLeftIndex].Position, InVertices[TopRightIndex].Position - InVertices[TopLeftIndex].Position).GetSafeNormal();
 
 			// If not smoothing we just set the vertex normal to the same normal as the polygon they belong to
 			InVertices[BottomLeftIndex].Normal = InVertices[BottomRightIndex].Normal = InVertices[TopRightIndex].Normal = InVertices[TopLeftIndex].Normal = FPackedNormal(NormalCurrent);
@@ -139,32 +142,3 @@ void AHeightFieldNoiseActor::GenerateGrid(TArray<FRuntimeMeshVertexSimple>& InVe
 		}
 	}
 }
-
-
-#if WITH_EDITOR
-void AHeightFieldNoiseActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
-
-	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldNoiseActor, Size)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldNoiseActor, RandomSeed)))
-	{
-		// Same vert count, so just regen mesh with same buffers
-		GenerateMesh();
-	}
-	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldNoiseActor, LengthSections)) || (MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldNoiseActor, WidthSections)))
-	{
-		// Vertice count has changed, so reset buffer and then regen mesh
-		Vertices.Empty();
-		Triangles.Empty();
-		HeightValues.Empty();
-		bHaveBuffersBeenInitialized = false;
-		GenerateMesh();
-	}
-	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(AHeightFieldNoiseActor, Material)))
-	{
-		MeshComponent->SetMaterial(0, Material);
-	}
-}
-#endif // WITH_EDITOR

@@ -1,31 +1,28 @@
-// Copyright Sigurdur Gunnarsson. All Rights Reserved. 
-// Licensed under the MIT License. See LICENSE file in the project root for full license information. 
-// Example cube mesh
+// Copyright 2016, Sigurdur Gunnarsson. All Rights Reserved. 
+// Example cube
 
 #include "ProceduralMeshesPrivatePCH.h"
 #include "SimpleCubeActor.h"
 
 ASimpleCubeActor::ASimpleCubeActor()
 {
-	RootNode = CreateDefaultSubobject<USceneComponent>("Root");
-	RootComponent = RootNode;
-
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 	MeshComponent = CreateDefaultSubobject<URuntimeMeshComponent>(TEXT("ProceduralMesh"));
 	MeshComponent->bShouldSerializeMeshData = false;
 	MeshComponent->SetupAttachment(RootComponent);
 }
 
-// This is called when actor is spawned (at runtime or when you drop it into the world in editor)
-void ASimpleCubeActor::PostActorCreated()
+#if WITH_EDITOR  
+void ASimpleCubeActor::OnConstruction(const FTransform& Transform)
 {
-	Super::PostActorCreated();
+	Super::OnConstruction(Transform);
 	GenerateMesh();
 }
+#endif // WITH_EDITOR
 
-// This is called when actor is already in level and map is opened
-void ASimpleCubeActor::PostLoad()
+void ASimpleCubeActor::BeginPlay()
 {
-	Super::PostLoad();
+	Super::BeginPlay();
 	GenerateMesh();
 }
 
@@ -136,21 +133,3 @@ void ASimpleCubeActor::BuildQuad(TArray<FRuntimeMeshVertexSimple>& InVertices, T
 	InVertices[Index1].Normal = InVertices[Index2].Normal = InVertices[Index3].Normal = InVertices[Index4].Normal = Normal;
 	InVertices[Index1].Tangent = InVertices[Index2].Tangent = InVertices[Index3].Tangent = InVertices[Index4].Tangent = Tangent;
 }
-
-#if WITH_EDITOR
-void ASimpleCubeActor::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
-{
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-
-	FName MemberPropertyChanged = (PropertyChangedEvent.MemberProperty ? PropertyChangedEvent.MemberProperty->GetFName() : NAME_None);
-
-	if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCubeActor, Size)))
-	{
-		GenerateMesh();
-	}
-	else if ((MemberPropertyChanged == GET_MEMBER_NAME_CHECKED(ASimpleCubeActor, Material)))
-	{
-		MeshComponent->SetMaterial(0, Material);
-	}
-}
-#endif // WITH_EDITOR
