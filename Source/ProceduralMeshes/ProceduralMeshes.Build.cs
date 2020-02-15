@@ -4,7 +4,7 @@ using UnrealBuildTool;
 
 public class ProceduralMeshes : ModuleRules
 {
-	public ProceduralMeshes(TargetInfo Target)
+	public ProceduralMeshes(ReadOnlyTargetRules Target) : base(Target)
 	{
 		
 		PublicIncludePaths.AddRange(new string[] { "ProceduralMeshes/Public" });
